@@ -433,11 +433,12 @@ forward or backward through the keys one at a time.
 The following functions are available on the cursor:
 
 ```
-First()  Move to the first key.
-Last()   Move to the last key.
-Seek()   Move to a specific key.
-Next()   Move to the next key.
-Prev()   Move to the previous key.
+First()        Move to the first key.
+Last()         Move to the last key.
+Seek()         Move to a specific key or a minimal key with specific prefix.
+SeekReverse()  Move to a specific key or a maximal key with specific prefix.
+Next()         Move to the next key.
+Prev()         Move to the previous key.
 ```
 
 Each of those functions has a return signature of `(key []byte, value []byte)`.

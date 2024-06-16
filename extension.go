@@ -149,7 +149,7 @@ func (c *Cursor) searchPageCustom(highest *[]byte, p *common.Page, f TreeElement
 }
 
 func CompareTreeElements(highest *[]byte, k, v []byte) (right bool, exact bool) {
-	if bytes.Compare(k, *highest) >= 0 {
+	if bytes.Compare(k, *highest) > 0 {
 		return true, false
 	} else if bytes.Compare(k, *highest) == 0 {
 		return true, true
