@@ -7,8 +7,8 @@ import (
 	"go.etcd.io/bbolt/internal/common"
 )
 
-type TreeElementsComparer func(k, v []byte) (right bool, exact bool)
-type Search func(n int, f func(int) bool) int
+type TreeElementsComparer func(k, v []byte) (right, exact, hasPrefix bool)
+type Search func(flag uint8, n int, f func(int) (bool, bool)) int
 
 func (c *Cursor) SeekReverse(seek []byte) (key, value []byte) {
 
@@ -28,38 +28,47 @@ func (c *Cursor) SeekReverse(seek []byte) (key, value []byte) {
 			}
 		}
 	}
-	cp := func(k, v []byte) (right bool, exact bool) {
+	cp := func(k, v []byte) (right, exact, hasPrefix bool) {
 		if bytes.Compare(k, seek) > 0 {
-			if bytes.Compare(k, seek) > 0 && bytes.Compare(k, maxValue) < 0 {
+			if bytes.Compare(k, maxValue) < 0 {
 				if bytes.HasPrefix(k, saved) {
 					seek = k
+					hasPrefix = true
+					if bytes.Compare(k, highest) == 0 {
+						return true, true, true
+					}
 				}
-				if bytes.Compare(k, highest) == 0 {
-					return true, true
-				}
-				return false, false
+
+				return false, false, hasPrefix
 			}
-			return true, false
+			return true, false, hasPrefix
 		} else if bytes.Compare(k, seek) == 0 {
-			return true, true
+			return true, true, hasPrefix
 		} else {
-			return false, false
+			return false, false, hasPrefix
 		}
 	}
-	s := func(n int, f func(int) bool) int {
+	s := func(flag uint8, n int, f func(int) (right, hasPrefix bool)) int {
 		// Define f(-1) == false and f(n) == true.
 		// Invariant: f(i-1) == false, f(j) == true.
-		i, j := 0, n
+		i, j, b := 0, n, 0
+		var hasPrefix, right bool
 		for i < j {
 			h := int(uint(i+j) >> 1) // avoid overflow when computing h
 			// i ≤ h < j
-			if !f(h) {
+			right, hasPrefix = f(h)
+			if hasPrefix {
+				b = h
+			}
+			if !right {
 				i = h + 1 // preserves f(i-1) == false
 			} else {
 				j = h // preserves f(j) == true
 			}
 		}
-
+		if flag == common.LeafPageFlag && i == n && hasPrefix {
+			return b
+		}
 		// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
 		return i
 	}
@@ -122,9 +131,9 @@ func (c *Cursor) nsearchCustom(s Search, f TreeElementsComparer) {
 
 	// If we have a node then search its inodes.
 	if n != nil {
-		index := s(len(n.inodes), func(i int) bool {
-			right, _ := f(n.inodes[i].Key(), n.inodes[i].Value())
-			return right
+		index := s(common.LeafPageFlag, len(n.inodes), func(i int) (right, hasPrefix bool) {
+			right, _, hasPrefix = f(n.inodes[i].Key(), n.inodes[i].Value())
+			return right, hasPrefix
 		})
 		e.index = index
 		return
@@ -132,9 +141,9 @@ func (c *Cursor) nsearchCustom(s Search, f TreeElementsComparer) {
 
 	// If we have a page then search its leaf elements.
 	inodes := p.LeafPageElements()
-	index := s(int(p.Count()), func(i int) bool {
-		right, _ := f(inodes[i].Key(), inodes[i].Value())
-		return right
+	index := s(common.LeafPageFlag, int(p.Count()), func(i int) (right, hasPrefix bool) {
+		right, _, hasPrefix = f(inodes[i].Key(), inodes[i].Value())
+		return right, hasPrefix
 	})
 	e.index = index
 }
@@ -144,13 +153,12 @@ func (c *Cursor) searchNodeCustom(n *node, s Search, f TreeElementsComparer) {
 		exact bool
 	)
 
-	index := s(len(n.inodes), func(i int) bool {
+	index := s(0, len(n.inodes), func(i int) (right, hasPrefix bool) {
 		// TODO(benbjohnson): Optimize this range search. It's a bit hacky right now.
 		// sort.Search() finds the lowest index where f() != -1 but we need the highest index.
-		var right bool
-		right, exact = f(n.inodes[i].Key(), n.inodes[i].Value())
+		right, exact, hasPrefix = f(n.inodes[i].Key(), n.inodes[i].Value())
 
-		return right
+		return right, hasPrefix
 	})
 	if !exact && index > 0 {
 		index--
@@ -170,15 +178,14 @@ func (c *Cursor) searchPageCustom(p *common.Page, s Search, f TreeElementsCompar
 		index int
 	)
 
-	index = s(int(p.Count()), func(i int) bool {
+	index = s(0, int(p.Count()), func(i int) (right, hasPrefix bool) {
 		// TODO(benbjohnson): Optimize this range search. It's a bit hacky right now.
 		// sort.Search() finds the lowest index where f() != -1 but we need the highest index.
 		k := inodes[i].Key()
 
-		var right bool
-		right, exact = f(k, []byte{})
+		right, exact, hasPrefix = f(k, []byte{})
 
-		return right
+		return right, hasPrefix
 	})
 	if !exact && index > 0 {
 		index--

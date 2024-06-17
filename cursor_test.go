@@ -1021,7 +1021,7 @@ func ExampleCursor_SeekReverse() {
 		//
 		// The loop finishes at the beginning of the cursor when a nil key
 		// is returned.
-		k, v := c.SeekReverse([]byte("dogccc"))
+		k, v := c.SeekReverse([]byte("dog"))
 		fmt.Printf("A %s is %s.\n", k, v)
 
 		return nil
