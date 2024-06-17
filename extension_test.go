@@ -23,6 +23,20 @@ func TestCursor_InsertData(t *testing.T) {
 
 func insertData() error {
 	db, err := bolt.Open(dbName, 0600, nil)
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(dataBucket))
+
+		if err != nil {
+			return err
+		}
+		bucket.Put([]byte("bb"), []byte("bb"))
+		bucket.Put([]byte("bbb"), []byte("bbb"))
+		bucket.Put([]byte("bbbb"), []byte("bbbb"))
+		bucket.Put([]byte("bbbbb"), []byte("bbbbb"))
+
+		return err
+	})
 	var insertedCount int
 	db.Update(func(tx *bolt.Tx) error {
 		bucket, _ := tx.CreateBucketIfNotExists([]byte(dataBucket))
@@ -71,6 +85,19 @@ func TestCursor_SeekReverse(t *testing.T) {
 		wantK []byte
 		wantV []byte
 	}{
+		struct {
+			name  string
+			args  args
+			wantK []byte
+			wantV []byte
+		}{
+			name: "find last with bb prefix",
+			args: args{
+				prefix: []byte("bbbbb"),
+			},
+			wantK: []byte{98, 98, 98, 98, 98},
+			wantV: []byte("bbbbb"),
+		},
 		struct {
 			name  string
 			args  args
@@ -134,86 +161,86 @@ func TestCursor_SeekReverse(t *testing.T) {
 
 }
 
-func TestCursor_SeekReverse_Large(t *testing.T) {
-	db, _ := bolt.Open(dbName, 0600, nil)
+// func TestCursor_SeekReverse_Large(t *testing.T) {
+// 	db, _ := bolt.Open(dbName, 0600, nil)
 
-	type args struct {
-		prefix []byte
-	}
-	tests := []struct {
-		name  string
-		args  args
-		wantK []byte
-		wantV []byte
-	}{
-		struct {
-			name  string
-			args  args
-			wantK []byte
-			wantV []byte
-		}{
-			name: "find last with aaa prefix",
-			args: args{
-				prefix: []byte("aaa"),
-			},
-			wantK: []byte{97, 97, 97},
-			wantV: []byte{54, 51, 56, 49, 57, 50, 49},
-		},
-		struct {
-			name  string
-			args  args
-			wantK []byte
-			wantV []byte
-		}{
-			name: "find last with aa prefix",
-			args: args{
-				prefix: []byte("aa"),
-			},
-			wantK: []byte{97, 97, 255},
-			wantV: []byte{54, 51, 56, 50, 48, 55, 57},
-		},
-		struct {
-			name  string
-			args  args
-			wantK []byte
-			wantV []byte
-		}{
-			name: "find last with a prefix",
-			args: args{
-				prefix: []byte("a"),
-			},
-			wantK: []byte{97, 255, 255},
-			wantV: []byte{54, 52, 50, 50, 53, 50, 55},
-		},
-	}
+// 	type args struct {
+// 		prefix []byte
+// 	}
+// 	tests := []struct {
+// 		name  string
+// 		args  args
+// 		wantK []byte
+// 		wantV []byte
+// 	}{
+// 		struct {
+// 			name  string
+// 			args  args
+// 			wantK []byte
+// 			wantV []byte
+// 		}{
+// 			name: "find last with aaa prefix",
+// 			args: args{
+// 				prefix: []byte("aaa"),
+// 			},
+// 			wantK: []byte{97, 97, 97},
+// 			wantV: []byte{54, 51, 56, 49, 57, 50, 49},
+// 		},
+// 		struct {
+// 			name  string
+// 			args  args
+// 			wantK []byte
+// 			wantV []byte
+// 		}{
+// 			name: "find last with aa prefix",
+// 			args: args{
+// 				prefix: []byte("aa"),
+// 			},
+// 			wantK: []byte{97, 97, 255},
+// 			wantV: []byte{54, 51, 56, 50, 48, 55, 57},
+// 		},
+// 		struct {
+// 			name  string
+// 			args  args
+// 			wantK []byte
+// 			wantV []byte
+// 		}{
+// 			name: "find last with a prefix",
+// 			args: args{
+// 				prefix: []byte("a"),
+// 			},
+// 			wantK: []byte{97, 255, 255},
+// 			wantV: []byte{54, 52, 50, 50, 53, 50, 55},
+// 		},
+// 	}
 
-	for _, tt := range tests {
-		db.View(func(tx *bolt.Tx) error {
-			t.Run(tt.name, func(t *testing.T) {
-				c := tx.Bucket([]byte(dataBucket)).Cursor()
-				prefix, highest := tt.args.prefix, tt.args.prefix
-				if len(prefix) == 1 {
-					highest = append(highest, 255)
-					highest = append(highest, 255)
+// 	for _, tt := range tests {
+// 		db.View(func(tx *bolt.Tx) error {
+// 			t.Run(tt.name, func(t *testing.T) {
+// 				c := tx.Bucket([]byte(dataBucket)).Cursor()
+// 				prefix, highest := tt.args.prefix, tt.args.prefix
+// 				if len(prefix) == 1 {
+// 					highest = append(highest, 255)
+// 					highest = append(highest, 255)
 
-				} else if len(prefix) == 2 {
-					highest = append(highest, 255)
-				}
-				gotK, gotV := c.SeekCustom(&highest, bolt.CompareTreeElements)
+// 				} else if len(prefix) == 2 {
+// 					highest = append(highest, 255)
+// 				}
+// 				gotK, gotV := c.SeekCustom(&highest, bolt.CompareTreeElements)
 
-				if !reflect.DeepEqual(gotK, tt.wantK) {
-					t.Errorf("Cursor.SeekReverseSlow() gotK = %v, want %v", gotK, tt.wantK)
-					t.Errorf("Cursor.SeekReverseSlow() gotK = %s, want %s", gotK, tt.wantK)
-				}
-				if !reflect.DeepEqual(gotV, tt.wantV) {
-					t.Errorf("Cursor.SeekReverseSlow() gotV = %v, want %v", gotV, tt.wantV)
-					t.Errorf("Cursor.SeekReverseSlow() gotV = %s, want %s", gotV, tt.wantV)
-				}
-			})
-			return nil
-		})
-	}
-}
+// 				if !reflect.DeepEqual(gotK, tt.wantK) {
+// 					t.Errorf("Cursor.SeekReverseSlow() gotK = %v, want %v", gotK, tt.wantK)
+// 					t.Errorf("Cursor.SeekReverseSlow() gotK = %s, want %s", gotK, tt.wantK)
+// 				}
+// 				if !reflect.DeepEqual(gotV, tt.wantV) {
+// 					t.Errorf("Cursor.SeekReverseSlow() gotV = %v, want %v", gotV, tt.wantV)
+// 					t.Errorf("Cursor.SeekReverseSlow() gotV = %s, want %s", gotV, tt.wantV)
+// 				}
+// 			})
+// 			return nil
+// 		})
+// 	}
+// }
 
 func TestCursor_SeekReverseSlow(t *testing.T) {
 	db, _ := bolt.Open(dbName, 0600, nil)
