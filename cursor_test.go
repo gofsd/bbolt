@@ -1002,13 +1002,13 @@ func ExampleCursor_SeekReverse() {
 		}
 
 		// Insert data into a bucket.
-		if err := b.Put([]byte("dogaaa"), []byte("fun")); err != nil {
+		if err := b.Put([]byte("dog1"), []byte("fun")); err != nil {
 			log.Fatal(err)
 		}
-		if err := b.Put([]byte("dogbbb"), []byte("lame")); err != nil {
+		if err := b.Put([]byte("dog2"), []byte("lame")); err != nil {
 			log.Fatal(err)
 		}
-		if err := b.Put([]byte("dogccc"), []byte("awesome")); err != nil {
+		if err := b.Put([]byte("dog3"), []byte("awesome")); err != nil {
 			log.Fatal(err)
 		}
 
@@ -1021,8 +1021,9 @@ func ExampleCursor_SeekReverse() {
 		//
 		// The loop finishes at the beginning of the cursor when a nil key
 		// is returned.
-		k, v := c.SeekReverse([]byte("dog"))
-		fmt.Printf("A %s is %s.\n", k, v)
+		for k, v := c.SeekReverse([]byte("dog")); k != nil; k, v = c.Prev() {
+			fmt.Printf("A %s is %s.\n", k, v)
+		}
 
 		return nil
 	}); err != nil {
@@ -1035,7 +1036,7 @@ func ExampleCursor_SeekReverse() {
 	}
 
 	// Output:
-	// A liger is awesome.
-	// A dog is fun.
-	// A cat is lame.
+	// A dog3 is awesome.
+	// A dog2 is lame.
+	// A dog1 is fun.
 }

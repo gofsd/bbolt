@@ -12,28 +12,29 @@ type Search func(flag uint8, n int, f func(int) (bool, bool)) int
 
 func (c *Cursor) SeekReverse(seek []byte) (key, value []byte) {
 
-	var maxValue, saved []byte
+	var maxValue, saved, highest []byte
 	saved = append(saved, seek...)
-	l := len(seek)
 	maxValue = append(maxValue, seek...)
-	maxValue[l-1] = maxValue[l-1] + 1
-	lastKey, _ := c.Last()
-	lkLength := len(lastKey)
-	var highest = make([]byte, lkLength)
-	copy(highest, saved)
-	if len(seek) < lkLength {
-		for i := range lkLength {
-			if len(seek) <= i {
-				highest[i] = 255
-			}
-		}
+	highest = append(highest, seek...)
+	if maxValue[len(maxValue)-1] == 255 {
+		maxValue = append(maxValue, 1)
+	} else {
+		maxValue[len(maxValue)-1] = maxValue[len(maxValue)-1] + 1
 	}
+
 	cp := func(k, v []byte) (right, exact, hasPrefix bool) {
 		if bytes.Compare(k, seek) > 0 {
 			if bytes.Compare(k, maxValue) < 0 {
 				if bytes.HasPrefix(k, saved) {
 					seek = k
 					hasPrefix = true
+					if len(highest) < len(k) {
+						for i := range len(k) {
+							if len(highest) <= i {
+								highest = append(highest, 255)
+							}
+						}
+					}
 					if bytes.Compare(k, highest) == 0 {
 						return true, true, true
 					}
