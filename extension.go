@@ -18,15 +18,21 @@ func (c *Cursor) SeekReverse(seek []byte) (key, value []byte) {
 	highest = append(highest, seek...)
 	if maxValue[len(maxValue)-1] == 255 {
 		var shouldIncreasePlace = true
+		var newMaxValue = make([]byte, len(maxValue), len(maxValue))
+		copy(newMaxValue, maxValue)
 		for i := len(maxValue) - 1; i >= 0; i-- {
 			if maxValue[i] < 255 {
-				maxValue[i] = maxValue[i] + 1
+				newMaxValue[i] = maxValue[i] + 1
 				shouldIncreasePlace = false
 				break
+			} else {
+				newMaxValue[i] = 0
 			}
 		}
 		if shouldIncreasePlace {
 			maxValue = append(maxValue, 0)
+		} else {
+			maxValue = newMaxValue
 		}
 	} else {
 		maxValue[len(maxValue)-1] = maxValue[len(maxValue)-1] + 1
